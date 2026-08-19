@@ -3,7 +3,7 @@ setlocal EnableExtensions
 
 fltmc >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Run this script as Administrator.
+    echo [错误] 请右键选择“以管理员身份运行”。
     goto :Failure
 )
 
@@ -12,28 +12,28 @@ if not "%~1"=="" set "SERVICE_NAME=%~1"
 
 sc.exe query "%SERVICE_NAME%" >nul 2>&1
 if errorlevel 1 (
-    echo AudioPilot service is not installed.
+    echo AudioPilot 服务尚未安装。
     goto :StopAgents
 )
 
-echo Stopping %SERVICE_NAME% service...
+echo 正在停止 %SERVICE_NAME% 服务...
 sc.exe stop "%SERVICE_NAME%" >nul 2>&1
 call :WaitForStopped
 if errorlevel 1 goto :Failure
 
-echo Deleting %SERVICE_NAME% service...
+echo 正在删除 %SERVICE_NAME% 服务...
 sc.exe delete "%SERVICE_NAME%"
 if errorlevel 1 (
-    echo [ERROR] Unable to delete the service.
+    echo [错误] 无法删除服务。
     goto :Failure
 )
 call :WaitForDeleted
 if errorlevel 1 goto :Failure
 
 :StopAgents
-echo Stopping remaining AudioPilot agents...
+echo 正在停止残留的 AudioPilot 代理进程...
 taskkill.exe /F /IM AudioPilot.exe >nul 2>&1
-echo AudioPilot service uninstalled. Published files were kept.
+echo AudioPilot 服务已卸载，发布文件已保留。
 goto :Success
 
 :WaitForStopped
@@ -42,7 +42,7 @@ for /L %%I in (1,1,15) do (
     if not errorlevel 1 exit /b 0
     timeout /t 1 /nobreak >nul
 )
-echo [ERROR] Timed out waiting for the service to stop.
+echo [错误] 等待服务停止超时。
 exit /b 1
 
 :WaitForDeleted
@@ -51,7 +51,7 @@ for /L %%I in (1,1,30) do (
     if errorlevel 1 exit /b 0
     timeout /t 1 /nobreak >nul
 )
-echo [ERROR] Timed out waiting for the service to be deleted.
+echo [错误] 等待服务删除超时。
 exit /b 1
 
 :Success

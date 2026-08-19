@@ -3,7 +3,7 @@ setlocal EnableExtensions
 
 fltmc >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Run this script as Administrator.
+    echo [错误] 请右键选择“以管理员身份运行”。
     goto :Failure
 )
 
@@ -17,53 +17,53 @@ set "EXECUTABLE=%PUBLISH_DIR%\AudioPilot.exe"
 
 sc.exe query "%SERVICE_NAME%" >nul 2>&1
 if not errorlevel 1 (
-    echo Removing existing %SERVICE_NAME% service...
+    echo 正在移除现有的 %SERVICE_NAME% 服务...
     sc.exe stop "%SERVICE_NAME%" >nul 2>&1
     call :WaitForStopped
     if errorlevel 1 goto :Failure
 
     sc.exe delete "%SERVICE_NAME%"
     if errorlevel 1 (
-        echo [ERROR] Unable to delete the existing service.
+        echo [错误] 无法删除现有服务。
         goto :Failure
     )
     call :WaitForDeleted
     if errorlevel 1 goto :Failure
 )
 
-rem Remove agents left by an older or interrupted service installation.
+rem 清理由旧版本或安装中断遗留的代理进程。
 taskkill.exe /F /IM AudioPilot.exe >nul 2>&1
 
-echo Publishing AudioPilot...
+echo 正在发布 AudioPilot...
 dotnet publish "%PROJECT_FILE%" --configuration Release --runtime win-x64 --self-contained false --output "%PUBLISH_DIR%" -p:PublishSingleFile=true
 if errorlevel 1 (
-    echo [ERROR] dotnet publish failed.
+    echo [错误] dotnet publish 发布失败。
     goto :Failure
 )
 
-echo Creating %SERVICE_NAME% service...
+echo 正在创建 %SERVICE_NAME% 服务...
 sc.exe create "%SERVICE_NAME%" binPath= "\"%EXECUTABLE%\"" start= auto DisplayName= "AudioPilot"
 if errorlevel 1 (
-    echo [ERROR] Unable to create the service.
+    echo [错误] 无法创建服务。
     goto :Failure
 )
 
 sc.exe description "%SERVICE_NAME%" "Automatically switches Windows audio output based on the ROG headset wireless link." >nul
 sc.exe failure "%SERVICE_NAME%" reset= 86400 actions= restart/5000/restart/15000/restart/30000 >nul
 if errorlevel 1 (
-    echo [ERROR] Unable to configure service recovery.
+    echo [错误] 无法配置服务故障恢复。
     goto :Failure
 )
 
 sc.exe start "%SERVICE_NAME%"
 if errorlevel 1 (
-    echo [ERROR] Unable to start the service.
+    echo [错误] 无法启动服务。
     goto :Failure
 )
 
 echo.
-echo AudioPilot service installed and started successfully.
-echo Executable: %EXECUTABLE%
+echo AudioPilot 服务已成功安装并启动。
+echo 程序路径：%EXECUTABLE%
 goto :Success
 
 :WaitForStopped
@@ -72,7 +72,7 @@ for /L %%I in (1,1,15) do (
     if not errorlevel 1 exit /b 0
     timeout /t 1 /nobreak >nul
 )
-echo [ERROR] Timed out waiting for the existing service to stop.
+echo [错误] 等待现有服务停止超时。
 exit /b 1
 
 :WaitForDeleted
@@ -81,7 +81,7 @@ for /L %%I in (1,1,30) do (
     if errorlevel 1 exit /b 0
     timeout /t 1 /nobreak >nul
 )
-echo [ERROR] Timed out waiting for the existing service to be deleted.
+echo [错误] 等待现有服务删除超时。
 exit /b 1
 
 :Success
