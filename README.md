@@ -25,18 +25,18 @@ AudioPilot 是一个面向 Windows 的轻量级 .NET 10 工具。它监听音频
 
 ## Windows 服务
 
-```powershell
-# 使用“以管理员身份运行”的 PowerShell
-.\install-service.ps1
+```bat
+# 使用“以管理员身份运行”的命令提示符
+install-service.bat
 ```
 
 安装脚本会发布 `win-x64` Release 版本、注册自动启动服务、配置失败重启并启动服务。Windows 服务运行在 Session 0，因此服务会在当前登录用户的会话中启动一个无窗口代理，确保修改的是该用户的默认音频设备。
 
 卸载服务：
 
-```powershell
-# 使用“以管理员身份运行”的 PowerShell
-.\uninstall-service.ps1
+```bat
+# 使用“以管理员身份运行”的命令提示符
+uninstall-service.bat
 ```
 
 卸载脚本会保留 `publish` 文件，方便重新安装。交互式调试仍可使用 `dotnet run`，按 `Ctrl+C` 退出。
