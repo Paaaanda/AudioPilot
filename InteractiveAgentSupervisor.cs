@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -11,7 +10,7 @@ internal sealed class InteractiveAgentSupervisor(
     ILogger<InteractiveAgentSupervisor> logger) : BackgroundService
 {
     private const uint NoActiveSession = 0xFFFFFFFF;
-    private Process? _agent;
+    private AgentProcess? _agent;
     private uint _agentSessionId = NoActiveSession;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -65,7 +64,7 @@ internal sealed class InteractiveAgentSupervisor(
         }
     }
 
-    private static Process StartAgent(uint sessionId)
+    private static AgentProcess StartAgent(uint sessionId)
     {
         if (!WTSQueryUserToken(sessionId, out var userToken))
         {
@@ -122,10 +121,21 @@ internal sealed class InteractiveAgentSupervisor(
                         throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateProcessAsUser failed.");
                     }
 
-                    using (processInfo.ThreadHandle)
-                    using (processInfo.ProcessHandle)
+                    using var threadHandle = new SafeFileHandle(
+                        processInfo.ThreadHandle,
+                        ownsHandle: true);
+                    var processHandle = new SafeFileHandle(
+                        processInfo.ProcessHandle,
+                        ownsHandle: true);
+
+                    try
                     {
-                        return Process.GetProcessById((int)processInfo.ProcessId);
+                        return new AgentProcess(processHandle, (int)processInfo.ProcessId);
+                    }
+                    catch
+                    {
+                        processHandle.Dispose();
+                        throw;
                     }
                 }
                 finally
@@ -144,8 +154,8 @@ internal sealed class InteractiveAgentSupervisor(
             {
                 if (!_agent.HasExited)
                 {
-                    _agent.Kill(entireProcessTree: true);
-                    _agent.WaitForExit(5000);
+                    _agent.Terminate();
+                    _agent.WaitForExit(TimeSpan.FromSeconds(5));
                 }
             }
             catch (Exception exception)
@@ -164,6 +174,58 @@ internal sealed class InteractiveAgentSupervisor(
 
     private const int SecurityImpersonation = 2;
     private const int TokenPrimary = 1;
+    private const uint WaitObject0 = 0;
+    private const uint WaitTimeout = 258;
+
+    private sealed class AgentProcess(SafeFileHandle processHandle, int id) : IDisposable
+    {
+        public int Id { get; } = id;
+
+        public bool HasExited
+        {
+            get
+            {
+                var result = WaitForSingleObject(processHandle, 0);
+                return result switch
+                {
+                    WaitObject0 => true,
+                    WaitTimeout => false,
+                    _ => throw new Win32Exception(
+                        Marshal.GetLastWin32Error(),
+                        "WaitForSingleObject failed.")
+                };
+            }
+        }
+
+        public void Terminate()
+        {
+            if (!TerminateProcess(processHandle, 0))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "TerminateProcess failed.");
+            }
+        }
+
+        public bool WaitForExit(TimeSpan timeout)
+        {
+            var milliseconds = timeout.TotalMilliseconds switch
+            {
+                <= 0 => 0u,
+                >= uint.MaxValue - 1 => uint.MaxValue - 1,
+                _ => (uint)timeout.TotalMilliseconds
+            };
+            var result = WaitForSingleObject(processHandle, milliseconds);
+            return result switch
+            {
+                WaitObject0 => true,
+                WaitTimeout => false,
+                _ => throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "WaitForSingleObject failed.")
+            };
+        }
+
+        public void Dispose() => processHandle.Dispose();
+    }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct StartupInfo
@@ -191,8 +253,8 @@ internal sealed class InteractiveAgentSupervisor(
     [StructLayout(LayoutKind.Sequential)]
     private struct ProcessInformation
     {
-        public SafeFileHandle ProcessHandle;
-        public SafeFileHandle ThreadHandle;
+        public IntPtr ProcessHandle;
+        public IntPtr ThreadHandle;
         public uint ProcessId;
         public uint ThreadId;
     }
@@ -239,4 +301,11 @@ internal sealed class InteractiveAgentSupervisor(
         string currentDirectory,
         ref StartupInfo startupInfo,
         out ProcessInformation processInformation);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern uint WaitForSingleObject(SafeFileHandle handle, uint milliseconds);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool TerminateProcess(SafeFileHandle process, uint exitCode);
 }

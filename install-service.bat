@@ -15,18 +15,12 @@ set "PROJECT_FILE=%PROJECT_ROOT%AudioPilot.csproj"
 set "PUBLISH_DIR=%PROJECT_ROOT%publish\win-x64"
 set "EXECUTABLE=%PUBLISH_DIR%\AudioPilot.exe"
 
-echo Publishing AudioPilot...
-dotnet publish "%PROJECT_FILE%" --configuration Release --runtime win-x64 --self-contained false --output "%PUBLISH_DIR%" -p:PublishSingleFile=true
-if errorlevel 1 (
-    echo [ERROR] dotnet publish failed.
-    exit /b 1
-)
-
 sc.exe query "%SERVICE_NAME%" >nul 2>&1
 if not errorlevel 1 (
     echo Removing existing %SERVICE_NAME% service...
     sc.exe stop "%SERVICE_NAME%" >nul 2>&1
     call :WaitForStopped
+    if errorlevel 1 exit /b 1
 
     sc.exe delete "%SERVICE_NAME%"
     if errorlevel 1 (
@@ -35,6 +29,16 @@ if not errorlevel 1 (
     )
     call :WaitForDeleted
     if errorlevel 1 exit /b 1
+)
+
+rem Remove agents left by an older or interrupted service installation.
+taskkill.exe /F /IM AudioPilot.exe >nul 2>&1
+
+echo Publishing AudioPilot...
+dotnet publish "%PROJECT_FILE%" --configuration Release --runtime win-x64 --self-contained false --output "%PUBLISH_DIR%" -p:PublishSingleFile=true
+if errorlevel 1 (
+    echo [ERROR] dotnet publish failed.
+    exit /b 1
 )
 
 echo Creating %SERVICE_NAME% service...
@@ -68,7 +72,8 @@ for /L %%I in (1,1,15) do (
     if not errorlevel 1 exit /b 0
     timeout /t 1 /nobreak >nul
 )
-exit /b 0
+echo [ERROR] Timed out waiting for the existing service to stop.
+exit /b 1
 
 :WaitForDeleted
 for /L %%I in (1,1,30) do (

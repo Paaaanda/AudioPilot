@@ -25,6 +25,18 @@ return 0;
 
 static async Task RunAgentAsync()
 {
+    using var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
+    var sessionId = currentProcess.SessionId;
+    using var singleInstance = new Mutex(
+        initiallyOwned: true,
+        name: $"Local\\AudioPilot.Agent.{sessionId}",
+        createdNew: out var createdNew);
+
+    if (!createdNew)
+    {
+        return;
+    }
+
     var configPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
     var config = AudioPilotConfig.Load(configPath);
     var log = new AudioPilotLog();
