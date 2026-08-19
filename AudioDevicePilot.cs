@@ -10,12 +10,19 @@ internal sealed class AudioDevicePilot : IDisposable
     private readonly Timer _timer;
     private readonly Timer _pollTimer;
     private readonly RogDeltaIIConnectionProbe _headsetProbe;
+    private readonly Action<string> _logInfo;
+    private readonly Action<string> _logError;
     private readonly object _gate = new();
     private bool _disposed;
 
-    public AudioDevicePilot(AudioPilotConfig config)
+    public AudioDevicePilot(
+        AudioPilotConfig config,
+        Action<string>? logInfo = null,
+        Action<string>? logError = null)
     {
         _config = config;
+        _logInfo = logInfo ?? Console.WriteLine;
+        _logError = logError ?? Console.Error.WriteLine;
         _enumerator = ComFactory.Create<IMMDeviceEnumerator>(
             "BCDE0395-E52F-467C-8E3D-C4579291692E");
         _notificationClient = new DeviceNotificationClient(ScheduleEvaluation);
@@ -53,7 +60,7 @@ internal sealed class AudioDevicePilot : IDisposable
 
                 if (connected is null)
                 {
-                    Console.WriteLine($"[{DateTime.Now:T}] 无法读取耳机无线链路，保留当前默认输出。");
+                    _logInfo("无法读取耳机无线链路，保留当前默认输出。");
                     return;
                 }
 
@@ -61,19 +68,19 @@ internal sealed class AudioDevicePilot : IDisposable
 
                 if (target is null)
                 {
-                    Console.WriteLine($"[{DateTime.Now:T}] 未找到可用目标设备。");
+                    _logInfo("未找到可用目标设备。");
                     return;
                 }
 
                 if (!IsDefaultDevice(target.Id))
                 {
                     SetDefaultDevice(target.Id);
-                    Console.WriteLine($"[{DateTime.Now:T}] 默认输出：{target.Name}");
+                    _logInfo($"默认输出：{target.Name}");
                 }
             }
             catch (Exception exception)
             {
-                Console.Error.WriteLine($"[{DateTime.Now:T}] 切换失败：{exception.Message}");
+                _logError($"切换失败：{exception.Message}");
             }
         }
     }
