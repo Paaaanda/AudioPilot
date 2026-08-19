@@ -9,7 +9,7 @@ AudioPilot 是一个面向 Windows 的轻量级 .NET 10 工具。它监听音频
 ```json
 {
   "HeadsetNameContains": "ROG",
-  "FallbackNameContains": "Speakers",
+  "FallbackNameContains": "U2790B",
   "SwitchDelayMilliseconds": 750
 }
 ```

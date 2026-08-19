@@ -5,7 +5,7 @@ namespace AudioPilot;
 internal sealed record AudioPilotConfig
 {
     public string HeadsetNameContains { get; init; } = "ROG";
-    public string FallbackNameContains { get; init; } = "Speakers";
+    public string FallbackNameContains { get; init; } = "U2790B";
     public int SwitchDelayMilliseconds { get; init; } = 750;
 
     public static AudioPilotConfig Load(string path)
