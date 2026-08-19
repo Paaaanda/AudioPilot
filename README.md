@@ -10,13 +10,18 @@ AudioPilot 是一个面向 Windows 的轻量级 .NET 10 工具。它监听音频
 {
   "HeadsetNameContains": "ROG",
   "FallbackNameContains": "U2790B",
-  "SwitchDelayMilliseconds": 750
+  "SwitchDelayMilliseconds": 750,
+  "PollIntervalMilliseconds": 2000,
+  "HeadsetVendorId": 2821,
+  "HeadsetProductId": 6906
 }
 ```
 
 - `HeadsetNameContains`：耳机设备名称中包含的文字。
 - `FallbackNameContains`：备用输出设备名称中包含的文字；中文 Windows 上通常需要改成设备实际名称，例如“扬声器”。
 - `SwitchDelayMilliseconds`：设备变化后等待多久再切换，用于避开驱动初始化抖动。
+- `PollIntervalMilliseconds`：查询 ROG 2.4G 无线链路的间隔。
+- `HeadsetVendorId` / `HeadsetProductId`：ROG Delta II 接收器的 USB VID/PID（默认 `0B05:1AFA` 的十进制值）。
 
 ## 运行
 
@@ -26,15 +31,13 @@ dotnet run
 
 按 `Ctrl+C` 退出。
 
-## ROG Delta II / 棱镜 2 的限制
+## ROG Delta II / 棱镜 2 检测
 
-如果 2.4G 接收器一直插着，耳机关机后 Windows 仍可能把接收器对应的音频端点报告为 `Active`。这种情况下 Windows Core Audio 不会发出可用于判断耳机无线链路断开的状态变化，AudioPilot 也就无法仅凭端点状态识别耳机本体是否关机。
-
-当前版本适用于插拔接收器，或驱动会在耳机开关机时改变端点状态的设备。后续可以针对 ROG USB/HID 遥测继续增加检测方式。
+ROG 2.4G 接收器在耳机关机后仍会保持 Windows 音频端点为 `Active`。AudioPilot 因此会额外通过接收器的厂商 HID 接口查询无线链路，而不是仅依赖 Core Audio 端点状态。无线链路断开时切换到备用输出，恢复时切回耳机。
 
 ## 技术说明
 
-项目直接调用 Windows Core Audio COM API，不依赖第三方 NuGet 包。默认输出会同时设置到 Console、Multimedia 和 Communications 三种角色。
+项目调用 Windows Core Audio COM API，并使用 HidSharp 访问 ROG 接收器的 HID 接口。默认输出会同时设置到 Console、Multimedia 和 Communications 三种角色。
 
 ## License
 

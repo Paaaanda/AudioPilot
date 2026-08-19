@@ -8,6 +8,8 @@ internal sealed class AudioDevicePilot : IDisposable
     private readonly IMMDeviceEnumerator _enumerator;
     private readonly DeviceNotificationClient _notificationClient;
     private readonly Timer _timer;
+    private readonly Timer _pollTimer;
+    private readonly RogDeltaIIConnectionProbe _headsetProbe;
     private readonly object _gate = new();
     private bool _disposed;
 
@@ -18,12 +20,16 @@ internal sealed class AudioDevicePilot : IDisposable
             "BCDE0395-E52F-467C-8E3D-C4579291692E");
         _notificationClient = new DeviceNotificationClient(ScheduleEvaluation);
         _timer = new Timer(_ => Evaluate(), null, Timeout.Infinite, Timeout.Infinite);
+        _pollTimer = new Timer(_ => Evaluate(), null, Timeout.Infinite, Timeout.Infinite);
+        _headsetProbe = new RogDeltaIIConnectionProbe(config.HeadsetVendorId, config.HeadsetProductId);
     }
 
     public void Start()
     {
         Marshal.ThrowExceptionForHR(_enumerator.RegisterEndpointNotificationCallback(_notificationClient));
         Evaluate();
+        var interval = Math.Max(500, _config.PollIntervalMilliseconds);
+        _pollTimer.Change(interval, interval);
     }
 
     private void ScheduleEvaluation() =>
@@ -42,7 +48,16 @@ internal sealed class AudioDevicePilot : IDisposable
             {
                 var devices = GetRenderDevices();
                 var headset = Find(devices, _config.HeadsetNameContains, DeviceState.Active);
-                var target = headset ?? Find(devices, _config.FallbackNameContains, DeviceState.Active);
+                var fallback = Find(devices, _config.FallbackNameContains, DeviceState.Active);
+                var connected = headset is null ? false : _headsetProbe.TryGetConnectionState();
+
+                if (connected is null)
+                {
+                    Console.WriteLine($"[{DateTime.Now:T}] 无法读取耳机无线链路，保留当前默认输出。");
+                    return;
+                }
+
+                var target = connected.Value ? headset : fallback;
 
                 if (target is null)
                 {
@@ -50,8 +65,11 @@ internal sealed class AudioDevicePilot : IDisposable
                     return;
                 }
 
-                SetDefaultDevice(target.Id);
-                Console.WriteLine($"[{DateTime.Now:T}] 默认输出：{target.Name}");
+                if (!IsDefaultDevice(target.Id))
+                {
+                    SetDefaultDevice(target.Id);
+                    Console.WriteLine($"[{DateTime.Now:T}] 默认输出：{target.Name}");
+                }
             }
             catch (Exception exception)
             {
@@ -139,6 +157,24 @@ internal sealed class AudioDevicePilot : IDisposable
         }
     }
 
+    private bool IsDefaultDevice(string deviceId)
+    {
+        Marshal.ThrowExceptionForHR(_enumerator.GetDefaultAudioEndpoint(
+            EDataFlow.Render,
+            ERole.Multimedia,
+            out var current));
+
+        try
+        {
+            Marshal.ThrowExceptionForHR(current.GetId(out var currentId));
+            return string.Equals(currentId, deviceId, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(current);
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)
@@ -151,6 +187,7 @@ internal sealed class AudioDevicePilot : IDisposable
             _disposed = true;
             _enumerator.UnregisterEndpointNotificationCallback(_notificationClient);
             _timer.Dispose();
+            _pollTimer.Dispose();
             Marshal.ReleaseComObject(_enumerator);
         }
     }
