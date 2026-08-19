@@ -4,7 +4,7 @@ setlocal EnableExtensions
 fltmc >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Run this script as Administrator.
-    exit /b 1
+    goto :Failure
 )
 
 set "SERVICE_NAME=AudioPilot"
@@ -19,22 +19,22 @@ if errorlevel 1 (
 echo Stopping %SERVICE_NAME% service...
 sc.exe stop "%SERVICE_NAME%" >nul 2>&1
 call :WaitForStopped
-if errorlevel 1 exit /b 1
+if errorlevel 1 goto :Failure
 
 echo Deleting %SERVICE_NAME% service...
 sc.exe delete "%SERVICE_NAME%"
 if errorlevel 1 (
     echo [ERROR] Unable to delete the service.
-    exit /b 1
+    goto :Failure
 )
 call :WaitForDeleted
-if errorlevel 1 exit /b 1
+if errorlevel 1 goto :Failure
 
 :StopAgents
 echo Stopping remaining AudioPilot agents...
 taskkill.exe /F /IM AudioPilot.exe >nul 2>&1
 echo AudioPilot service uninstalled. Published files were kept.
-exit /b 0
+goto :Success
 
 :WaitForStopped
 for /L %%I in (1,1,15) do (
@@ -52,4 +52,14 @@ for /L %%I in (1,1,30) do (
     timeout /t 1 /nobreak >nul
 )
 echo [ERROR] Timed out waiting for the service to be deleted.
+exit /b 1
+
+:Success
+echo.
+pause
+exit /b 0
+
+:Failure
+echo.
+pause
 exit /b 1
