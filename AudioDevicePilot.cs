@@ -124,7 +124,7 @@ internal sealed class AudioDevicePilot : IDisposable
 
     private static void SetDefaultDevice(string deviceId)
     {
-        var policy = ComFactory.Create<IPolicyConfigVista>(
+        var policy = ComFactory.Create<IPolicyConfig>(
             "870AF99C-171D-4F9E-AF0D-E63DF40C2BC9");
         try
         {

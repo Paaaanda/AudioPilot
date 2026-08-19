@@ -116,8 +116,8 @@ internal interface IMMNotificationClient
 
 [ComImport]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-[Guid("568B9108-44BF-40B4-9006-86AFE5B5A620")]
-internal interface IPolicyConfigVista
+[Guid("F8679F50-850A-41CF-9C72-430F290290C8")]
+internal interface IPolicyConfig
 {
     [PreserveSig] int GetMixFormat();
     [PreserveSig] int GetDeviceFormat();
